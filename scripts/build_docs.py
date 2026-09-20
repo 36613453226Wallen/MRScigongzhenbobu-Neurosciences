@@ -8,6 +8,8 @@ import re
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
@@ -17,11 +19,15 @@ OUT = ROOT / "docs" / "export"
 OUT.mkdir(parents=True, exist_ok=True)
 
 FILES = {
+    "src": DOCS / "00_文献来源标注.md",
     "qa": DOCS / "01_问答详解_论文规格结论与性别差异.md",
     "adapt": DOCS / "02_长期结构改变_行事思考与适应方向.md",
     "struct": DOCS / "03_长期结构改变_文献笔记.md",
     "testo": DOCS / "04_睾酮保护原理_文献笔记.md",
 }
+
+INLINE_RE = re.compile(r"(\*\*[^*]+?\*\*|\[[^\]]+\]\([^)]+\))")
+LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
 
 def set_run_font(run, name="Microsoft YaHei", size=11, bold=False, color=None, italic=False):
@@ -86,6 +92,56 @@ def add_heading_para(doc, text, level):
     return p
 
 
+def add_hyperlink(paragraph, text, url, size=11, bold=False):
+    r_id = paragraph.part.relate_to(url, RT.HYPERLINK, is_external=True)
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+    new_run = OxmlElement("w:r")
+    rPr = OxmlElement("w:rPr")
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), "1A5F9E")
+    rPr.append(color)
+    u = OxmlElement("w:u")
+    u.set(qn("w:val"), "single")
+    rPr.append(u)
+    if bold:
+        rPr.append(OxmlElement("w:b"))
+    sz = OxmlElement("w:sz")
+    sz.set(qn("w:val"), str(int(size * 2)))
+    rPr.append(sz)
+    rFonts = OxmlElement("w:rFonts")
+    rFonts.set(qn("w:ascii"), "Calibri")
+    rFonts.set(qn("w:hAnsi"), "Calibri")
+    rFonts.set(qn("w:eastAsia"), "WenQuanYi Micro Hei")
+    rPr.append(rFonts)
+    new_run.append(rPr)
+    text_elem = OxmlElement("w:t")
+    text_elem.set(qn("xml:space"), "preserve")
+    text_elem.text = text
+    new_run.append(text_elem)
+    hyperlink.append(new_run)
+    paragraph._p.append(hyperlink)
+
+
+def fill_md_runs(paragraph, text, size=11, default_bold=False, color=None):
+    pos = 0
+    for m in INLINE_RE.finditer(text):
+        if m.start() > pos:
+            run = paragraph.add_run(text[pos:m.start()])
+            set_run_font(run, size=size, bold=default_bold, color=color or RGBColor(0x22, 0x22, 0x22))
+        token = m.group(0)
+        link = LINK_RE.fullmatch(token)
+        if link:
+            add_hyperlink(paragraph, link.group(1), link.group(2), size=size, bold=default_bold)
+        else:
+            run = paragraph.add_run(token[2:-2])
+            set_run_font(run, size=size, bold=True, color=color or RGBColor(0x22, 0x22, 0x22))
+        pos = m.end()
+    if pos < len(text):
+        run = paragraph.add_run(text[pos:])
+        set_run_font(run, size=size, bold=default_bold, color=color or RGBColor(0x22, 0x22, 0x22))
+
+
 def add_body(doc, text, *, bold=False, italic=False, quote=False, bullet=False):
     p = doc.add_paragraph()
     if bullet:
@@ -95,15 +151,13 @@ def add_body(doc, text, *, bold=False, italic=False, quote=False, bullet=False):
     if quote:
         p.paragraph_format.left_indent = Cm(0.8)
         p.paragraph_format.right_indent = Cm(0.5)
-    run = p.add_run(text)
-    set_run_font(run, size=11, bold=bold, italic=italic, color=RGBColor(0x22, 0x22, 0x22))
+    fill_md_runs(p, text, size=11, default_bold=bold, color=RGBColor(0x33, 0x33, 0x33) if italic else RGBColor(0x22, 0x22, 0x22))
+    if italic:
+        for run in p.runs:
+            run.italic = True
     p.paragraph_format.space_after = Pt(6)
     p.paragraph_format.line_spacing = 1.5
     return p
-
-
-def parse_inline_md(text: str) -> str:
-    return text
 
 
 def add_table_from_md(doc, rows):
@@ -118,17 +172,15 @@ def add_table_from_md(doc, rows):
             val = row[j] if j < len(row) else ""
             cell.text = ""
             p = cell.paragraphs[0]
-            run = p.add_run(val)
-            set_run_font(
-                run,
-                size=9.5,
-                bold=(i == 0),
+            fill_md_runs(
+                p,
+                val,
+                size=9,
+                default_bold=(i == 0),
                 color=RGBColor(0xFF, 0xFF, 0xFF) if i == 0 else RGBColor(0x22, 0x22, 0x22),
             )
             if i == 0:
                 shading = cell._element.get_or_add_tcPr()
-                from docx.oxml import OxmlElement
-
                 shd = OxmlElement("w:shd")
                 shd.set(qn("w:fill"), "1F3A5F")
                 shd.set(qn("w:val"), "clear")
@@ -197,8 +249,6 @@ def md_to_docx_parts(doc, md_text: str, skip_first_h1=False):
             buf.append(lines[i].strip())
             i += 1
         para = " ".join(buf)
-        para = re.sub(r"\*\*(.+?)\*\*", r"\1", para)
-        para = re.sub(r"`(.+?)`", r"\1", para)
         add_body(doc, para)
 
 
@@ -267,15 +317,27 @@ hr { border: 0; border-top: 1px solid #d5dde6; margin: 1.2em 0; }
 .cover .meta { color: #555; font-size: 11pt; line-height: 1.8; }
 .section-break { page-break-before: always; }
 code { font-family: "WenQuanYi Micro Hei Mono", monospace; font-size: 0.92em; }
+a { color: #125a9e; text-decoration: underline; }
 """
 
 
-def md_inline(s: str) -> str:
+def _fmt_plain(s: str) -> str:
     s = html.escape(s)
     s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
     s = re.sub(r"`(.+?)`", r"<code>\1</code>", s)
-    s = re.sub(r"\*(.+?)\*", r"<em>\1</em>", s)
     return s
+
+
+def md_inline(s: str) -> str:
+    out = []
+    last = 0
+    for m in LINK_RE.finditer(s):
+        out.append(_fmt_plain(s[last:m.start()]))
+        href = html.escape(m.group(2), quote=True)
+        out.append(f'<a href="{href}">{_fmt_plain(m.group(1))}</a>')
+        last = m.end()
+    out.append(_fmt_plain(s[last:]))
+    return "".join(out)
 
 
 def md_to_html_body(md_text: str) -> str:
@@ -383,6 +445,7 @@ def main():
         "问答详解 · 适应方向 · 境外与境内文献笔记",
         common_extra,
         [
+            (FILES["src"], "来源"),
             (FILES["qa"], "问答"),
             (FILES["adapt"], "适应"),
             (FILES["struct"], "结构"),
@@ -394,14 +457,14 @@ def main():
         "长期结构改变",
         "境外 4 篇 + 大陆境内 2 篇 文献笔记",
         common_extra + ["主题文档 3.1"],
-        [(FILES["struct"], "结构")],
+        [(FILES["src"], "来源"), (FILES["struct"], "结构")],
     )
     write_docx(
         OUT / "睾酮保护原理_文献笔记.docx",
         "睾酮保护原理",
         "境外 4 篇 + 大陆境内 2 篇 文献笔记",
         common_extra + ["主题文档 3.2"],
-        [(FILES["testo"], "睾酮")],
+        [(FILES["src"], "来源"), (FILES["testo"], "睾酮")],
     )
 
     html_specs = [
@@ -411,6 +474,7 @@ def main():
             "问答详解 · 适应方向 · 境外与境内文献笔记",
             common_extra,
             [
+                (FILES["src"], "来源"),
                 (FILES["qa"], "问答"),
                 (FILES["adapt"], "适应"),
                 (FILES["struct"], "结构"),
@@ -422,19 +486,30 @@ def main():
             "长期结构改变",
             "境外 4 篇 + 大陆境内 2 篇 文献笔记",
             common_extra + ["主题文档 3.1"],
-            [(FILES["struct"], "结构")],
+            [(FILES["src"], "来源"), (FILES["struct"], "结构")],
         ),
         (
             OUT / "睾酮保护原理_文献笔记.html",
             "睾酮保护原理",
             "境外 4 篇 + 大陆境内 2 篇 文献笔记",
             common_extra + ["主题文档 3.2"],
-            [(FILES["testo"], "睾酮")],
+            [(FILES["src"], "来源"), (FILES["testo"], "睾酮")],
         ),
     ]
     for path, title, subtitle, extras, sections in html_specs:
         path.write_text(html_doc(title, subtitle, extras, sections), encoding="utf-8")
         print("wrote", path)
+
+    archive = ROOT / "收录"
+    archive.mkdir(parents=True, exist_ok=True)
+    for name in (
+        "慢性应激大脑改变与睾酮保护_完整收录.docx",
+        "长期结构改变_文献笔记.docx",
+        "睾酮保护原理_文献笔记.docx",
+    ):
+        target = archive / name
+        target.write_bytes((OUT / name).read_bytes())
+        print("copied", target)
 
 
 if __name__ == "__main__":

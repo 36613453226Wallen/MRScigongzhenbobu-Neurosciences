@@ -16,4 +16,4 @@
 - `收录/睾酮保护原理_文献笔记.pdf` / `.docx`  
   体例同上。
 
-Markdown 底稿在 `docs/01`–`docs/04`。重新生成：`python3 scripts/build_docs.py`，再用 Chrome headless 将对应 html 打成 pdf。
+Markdown 底稿在 `docs/00`–`docs/04`（`00` 为来源标注说明）。重新生成：`python3 scripts/build_docs.py`，再用 `scripts/html_to_pdf.sh` 将对应 html 打成 pdf。每条文献在正文中标【截图他源】或【Cursor网搜】，并带超链接。

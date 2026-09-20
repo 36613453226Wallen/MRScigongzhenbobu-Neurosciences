@@ -15,7 +15,8 @@ for f in "慢性应激大脑改变与睾酮保护_完整收录" "长期结构改
     "file://$EXPORT/${f}.html" || true
   pkill -9 -f "user-data-dir=$udir" 2>/dev/null || true
   ls -la "$EXPORT/${f}.pdf"
+  cp -f "$EXPORT/${f}.pdf" "/workspace/收录/${f}.pdf"
   rm -rf "$udir"
 done
 echo ALL_OK
-ls -la "$EXPORT"/*.pdf
+ls -la "$EXPORT"/*.pdf /workspace/收录/*.pdf
