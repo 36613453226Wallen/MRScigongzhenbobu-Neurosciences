@@ -16,4 +16,11 @@
 - `收录/睾酮保护原理_文献笔记.pdf` / `.docx`  
   体例同上。
 
-Markdown 底稿在 `docs/00`–`docs/04`（`00` 为来源标注说明）。重新生成：`python3 scripts/build_docs.py`，再用 `scripts/html_to_pdf.sh` 将对应 html 打成 pdf。每条文献在正文中标【截图他源】或【Cursor网搜】，并带超链接。
+近 20 年代补充（与上一份文献笔记同目录下的子文件夹）：
+
+- `收录/长期结构改变2-近20年代补充/王丽杰2011_试验方法与SCL-90测评.docx`  
+  图一试验方法 + SCL-90 是什么、现在还在用吗（仅 docx，内嵌图一首页）。
+- `收录/长期结构改变2-近20年代补充/长期结构改变2_近20年代补充_文献笔记.docx` / `.pdf`  
+  2015 年至今中文 2 + 外文 2；体例同上，含相同观点与不同表现。
+
+Markdown 底稿在 `docs/00`–`docs/06`（`00` 为来源标注说明）。重新生成：`python3 scripts/build_docs.py`，再用 `scripts/html_to_pdf.sh` 将对应 html 打成 pdf。每条文献在正文中标【截图他源】或【Cursor网搜】，并带超链接。

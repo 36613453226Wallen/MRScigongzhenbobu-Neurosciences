@@ -24,10 +24,13 @@ FILES = {
     "adapt": DOCS / "02_长期结构改变_行事思考与适应方向.md",
     "struct": DOCS / "03_长期结构改变_文献笔记.md",
     "testo": DOCS / "04_睾酮保护原理_文献笔记.md",
+    "scl90": DOCS / "05_王丽杰2011_试验方法与SCL-90.md",
+    "struct2": DOCS / "06_长期结构改变2_近20年代补充_文献笔记.md",
 }
 
 INLINE_RE = re.compile(r"(\*\*[^*]+?\*\*|\[[^\]]+\]\([^)]+\))")
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+IMG_RE = re.compile(r"^!\[([^\]]*)\]\(([^)]+)\)$")
 
 
 def set_run_font(run, name="Microsoft YaHei", size=11, bold=False, color=None, italic=False):
@@ -142,6 +145,26 @@ def fill_md_runs(paragraph, text, size=11, default_bold=False, color=None):
         set_run_font(run, size=size, bold=default_bold, color=color or RGBColor(0x22, 0x22, 0x22))
 
 
+def add_image(doc, rel_path: str, caption: str = ""):
+    img_path = Path(rel_path)
+    if not img_path.is_absolute():
+        img_path = ROOT / rel_path
+    if not img_path.exists():
+        add_body(doc, f"[图片缺失：{rel_path}]", italic=True)
+        return
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run()
+    run.add_picture(str(img_path), width=Cm(14.2))
+    p.paragraph_format.space_after = Pt(4)
+    if caption:
+        cap = doc.add_paragraph()
+        cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = cap.add_run(caption)
+        set_run_font(r, size=9.5, italic=True, color=RGBColor(0x4A, 0x55, 0x60))
+        cap.paragraph_format.space_after = Pt(10)
+
+
 def add_body(doc, text, *, bold=False, italic=False, quote=False, bullet=False):
     p = doc.add_paragraph()
     if bullet:
@@ -209,6 +232,11 @@ def md_to_docx_parts(doc, md_text: str, skip_first_h1=False):
                 i += 1
             add_table_from_md(doc, rows)
             continue
+        img = IMG_RE.match(line.strip())
+        if img:
+            add_image(doc, img.group(2).strip(), img.group(1).strip())
+            i += 1
+            continue
         if line.startswith("# "):
             if skip_first_h1 and not skipped_h1:
                 skipped_h1 = True
@@ -245,6 +273,7 @@ def md_to_docx_parts(doc, md_text: str, skip_first_h1=False):
             and lines[i].strip()
             and not lines[i].startswith(("#", "|", "-", ">", "---"))
             and not re.match(r"^\d+\.\s+", lines[i])
+            and not IMG_RE.match(lines[i].strip())
         ):
             buf.append(lines[i].strip())
             i += 1
@@ -318,6 +347,9 @@ hr { border: 0; border-top: 1px solid #d5dde6; margin: 1.2em 0; }
 .section-break { page-break-before: always; }
 code { font-family: "WenQuanYi Micro Hei Mono", monospace; font-size: 0.92em; }
 a { color: #125a9e; text-decoration: underline; }
+figure { margin: 1em 0 1.2em; text-align: center; }
+figure img { max-width: 100%; height: auto; border: 1px solid #d5dde6; }
+figcaption { color: #4A5560; font-size: 9.5pt; font-style: italic; margin-top: 0.35em; }
 """
 
 
@@ -367,6 +399,13 @@ def md_to_html_body(md_text: str) -> str:
                     out.append("<tr>" + "".join(f"<td>{md_inline(c)}</td>" for c in r) + "</tr>")
                 out.append("</tbody></table>")
             continue
+        img = IMG_RE.match(line.strip())
+        if img:
+            src = html.escape(str((ROOT / img.group(2).strip()).resolve()), quote=True)
+            cap = md_inline(img.group(1))
+            out.append(f'<figure><img src="file://{src}" alt="{html.escape(img.group(1))}"/><figcaption>{cap}</figcaption></figure>')
+            i += 1
+            continue
         m = re.match(r"^(#{1,4})\s+(.*)$", line)
         if m:
             lv = len(m.group(1))
@@ -402,6 +441,7 @@ def md_to_html_body(md_text: str) -> str:
             and not lines[i].startswith(("#", "|", "-", ">", "---"))
             and not re.match(r"^\d+\.\s+", lines[i])
             and lines[i].strip() != "---"
+            and not IMG_RE.match(lines[i].strip())
         ):
             buf.append(lines[i].strip())
             i += 1
@@ -500,6 +540,42 @@ def main():
         path.write_text(html_doc(title, subtitle, extras, sections), encoding="utf-8")
         print("wrote", path)
 
+    supplement_extra = [
+        "对照底本：王丽杰 2011（心理学报）图二论点",
+        "时间窗：2015 年至今，越晚优先",
+        "中文 2 篇 + 外文 2 篇；体例同长期结构改变文献笔记",
+        "收录日期：2026-09-20",
+    ]
+    write_docx(
+        OUT / "王丽杰2011_试验方法与SCL-90测评.docx",
+        "图一试验方法与 SCL-90 测评",
+        "王丽杰 2011 首页方法还原 · 量表还在不在用",
+        [
+            "对应原文：心理学报 2011, 43(7):792–797",
+            "DOI: 10.3724/SP.J.1041.2011.00792",
+            "本文件仅 docx（含图一原页）",
+            "收录日期：2026-09-20",
+        ],
+        [(FILES["scl90"], "SCL-90")],
+    )
+    write_docx(
+        OUT / "长期结构改变2_近20年代补充_文献笔记.docx",
+        "长期结构改变 2：近 20 年代补充",
+        "2015 年至今 · 中文 2 篇 + 外文 2 篇",
+        supplement_extra,
+        [(FILES["struct2"], "补充")],
+    )
+    (OUT / "长期结构改变2_近20年代补充_文献笔记.html").write_text(
+        html_doc(
+            "长期结构改变 2：近 20 年代补充",
+            "2015 年至今 · 中文 2 篇 + 外文 2 篇",
+            supplement_extra,
+            [(FILES["struct2"], "补充")],
+        ),
+        encoding="utf-8",
+    )
+    print("wrote", OUT / "长期结构改变2_近20年代补充_文献笔记.html")
+
     archive = ROOT / "收录"
     archive.mkdir(parents=True, exist_ok=True)
     for name in (
@@ -510,6 +586,16 @@ def main():
         target = archive / name
         target.write_bytes((OUT / name).read_bytes())
         print("copied", target)
+
+    sub = archive / "长期结构改变2-近20年代补充"
+    sub.mkdir(parents=True, exist_ok=True)
+    (sub / "王丽杰2011_试验方法与SCL-90测评.docx").write_bytes(
+        (OUT / "王丽杰2011_试验方法与SCL-90测评.docx").read_bytes()
+    )
+    (sub / "长期结构改变2_近20年代补充_文献笔记.docx").write_bytes(
+        (OUT / "长期结构改变2_近20年代补充_文献笔记.docx").read_bytes()
+    )
+    print("copied supplement docx ->", sub)
 
 
 if __name__ == "__main__":

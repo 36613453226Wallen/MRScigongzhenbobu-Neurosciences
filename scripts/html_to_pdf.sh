@@ -2,7 +2,10 @@
 set -e
 CHROME=/usr/local/bin/google-chrome
 EXPORT=/workspace/docs/export
-for f in "慢性应激大脑改变与睾酮保护_完整收录" "长期结构改变_文献笔记" "睾酮保护原理_文献笔记"; do
+ARCHIVE=/workspace/收录
+SUB="$ARCHIVE/长期结构改变2-近20年代补充"
+mkdir -p "$ARCHIVE" "$SUB"
+for f in "慢性应激大脑改变与睾酮保护_完整收录" "长期结构改变_文献笔记" "睾酮保护原理_文献笔记" "长期结构改变2_近20年代补充_文献笔记"; do
   udir="/tmp/chrome-pdf-$(date +%s)-$RANDOM"
   mkdir -p "$udir"
   echo "=== printing $f ==="
@@ -15,8 +18,12 @@ for f in "慢性应激大脑改变与睾酮保护_完整收录" "长期结构改
     "file://$EXPORT/${f}.html" || true
   pkill -9 -f "user-data-dir=$udir" 2>/dev/null || true
   ls -la "$EXPORT/${f}.pdf"
-  cp -f "$EXPORT/${f}.pdf" "/workspace/收录/${f}.pdf"
+  if [ "$f" = "长期结构改变2_近20年代补充_文献笔记" ]; then
+    cp -f "$EXPORT/${f}.pdf" "$SUB/${f}.pdf"
+  else
+    cp -f "$EXPORT/${f}.pdf" "$ARCHIVE/${f}.pdf"
+  fi
   rm -rf "$udir"
 done
 echo ALL_OK
-ls -la "$EXPORT"/*.pdf /workspace/收录/*.pdf
+ls -la "$EXPORT"/*.pdf "$ARCHIVE"/*.pdf "$SUB"
